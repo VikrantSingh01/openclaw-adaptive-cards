@@ -168,6 +168,8 @@ No configuration needed — the plugin is stateless.
 
 This plugin was extracted from [openclaw/openclaw#33486](https://github.com/openclaw/openclaw/pull/33486) (*Extensions: add adaptive-cards extension for native GenUI*) at the maintainers' request to be published as a standalone third-party plugin.
 
+Community plugins listing PR: [openclaw/openclaw#41735](https://github.com/openclaw/openclaw/pull/41735)
+
 ## Related
 
 - [Adaptive Cards v1.5 Schema Explorer](https://adaptivecards.io/explorer/)
