@@ -10,11 +10,15 @@ import {
 } from "./constants.js";
 import { generateFallbackText } from "./fallback.js";
 import { buildCardPromptGuidance } from "./prompt.js";
+import { formatActionAsMessage } from "./actions.js";
+import type { CardActionPayload } from "./actions.js";
 
 // Re-export public API for consumers that parse markers themselves
 export { CARD_CLOSE_TAG, CARD_OPEN_TAG, DATA_CLOSE_TAG, DATA_OPEN_TAG } from "./constants.js";
 export { generateFallbackText } from "./fallback.js";
 export { buildCardPromptGuidance } from "./prompt.js";
+export { formatActionAsMessage } from "./actions.js";
+export type { CardActionPayload } from "./actions.js";
 
 /** Shape of the tool params after type-assertion. */
 interface AdaptiveCardParams {
@@ -275,4 +279,22 @@ export default function register(api: OpenClawPluginApi) {
       }
     },
   });
+
+  // ── Gateway Method: adaptive_cards.action ──
+  // Clients call this when a user taps an Action.Submit button on a rendered card.
+  // The action data is formatted as a follow-up message for the agent to process.
+  if (typeof api.registerGatewayMethod === "function") {
+    api.registerGatewayMethod(
+      "adaptive_cards.action",
+      (ctx: { respond: (ok: boolean, payload?: unknown) => void; params?: unknown }) => {
+        const payload = ctx.params as CardActionPayload | undefined;
+        if (!payload?.actionData) {
+          ctx.respond(false, { error: "Missing actionData in payload" });
+          return;
+        }
+        const message = formatActionAsMessage(payload);
+        ctx.respond(true, { message, actionData: payload.actionData });
+      },
+    );
+  }
 }
