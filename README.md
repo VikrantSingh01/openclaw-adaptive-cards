@@ -164,6 +164,10 @@ The agent calls the `adaptive_card` tool automatically when structured content b
 
 No configuration needed — the plugin is stateless.
 
+## Origin
+
+This plugin was extracted from [openclaw/openclaw#33486](https://github.com/openclaw/openclaw/pull/33486) (*Extensions: add adaptive-cards extension for native GenUI*) at the maintainers' request to be published as a standalone third-party plugin.
+
 ## Related
 
 - [Adaptive Cards v1.5 Schema Explorer](https://adaptivecards.io/explorer/)
