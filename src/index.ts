@@ -1,15 +1,26 @@
 import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import {
+  AC_VERSION,
+  CARD_CLOSE_TAG,
+  CARD_OPEN_TAG,
+  DATA_CLOSE_TAG,
+  DATA_OPEN_TAG,
+  DEFAULT_FALLBACK,
+} from "./constants.js";
+import { generateFallbackText } from "./fallback.js";
 
-/**
- * Marker tags used to embed Adaptive Card JSON inside tool result text.
- * Mobile apps extract the card JSON between these markers and render it natively.
- * Channels that don't understand the markers show the fallback text.
- */
-const CARD_OPEN_TAG = "<!--adaptive-card-->";
-const CARD_CLOSE_TAG = "<!--/adaptive-card-->";
+// Re-export public API for consumers that parse markers themselves
+export { CARD_CLOSE_TAG, CARD_OPEN_TAG, DATA_CLOSE_TAG, DATA_OPEN_TAG } from "./constants.js";
+export { generateFallbackText } from "./fallback.js";
 
-const DEFAULT_FALLBACK = "(Interactive card — open on a supported client to view.)";
+/** Shape of the tool params after type-assertion. */
+interface AdaptiveCardParams {
+  body: unknown[];
+  actions?: unknown[];
+  fallback_text?: string;
+  template_data?: unknown;
+}
 
 function textResult(text: string) {
   return {
@@ -18,7 +29,53 @@ function textResult(text: string) {
   };
 }
 
+/**
+ * Assemble a full AdaptiveCard v1.5 envelope from tool params.
+ * Returns the JSON string and the computed fallback text.
+ */
+function buildCardPayload(params: AdaptiveCardParams) {
+  const card: Record<string, unknown> = {
+    type: "AdaptiveCard",
+    version: AC_VERSION,
+    body: params.body,
+  };
+  if (Array.isArray(params.actions) && params.actions.length > 0) {
+    card.actions = params.actions;
+  }
+
+  const cardJson = JSON.stringify(card);
+  const generated = generateFallbackText(params.body);
+  const fallback = params.fallback_text || generated || DEFAULT_FALLBACK;
+  const templateData = params.template_data ?? null;
+
+  return { cardJson, fallback, templateData };
+}
+
+/**
+ * Embed card JSON between marker tags inside tool result text.
+ *
+ * The text survives gateway sanitization (which only truncates, doesn't strip).
+ * Mobile apps extract the JSON between markers and render natively.
+ * Channels that don't parse markers just show the fallback text.
+ */
+function buildMarkedText(cardJson: string, fallback: string, templateData: unknown): string {
+  const parts: string[] = [];
+  if (fallback) {
+    parts.push(fallback, "");
+  }
+  parts.push(`${CARD_OPEN_TAG}${cardJson}${CARD_CLOSE_TAG}`);
+  if (templateData) {
+    parts.push(`${DATA_OPEN_TAG}${JSON.stringify(templateData)}${DATA_CLOSE_TAG}`);
+  }
+  return parts.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Plugin registration
+// ---------------------------------------------------------------------------
+
 export default function register(api: OpenClawPluginApi) {
+  // ── Tool: adaptive_card ──
   api.registerTool({
     name: "adaptive_card",
     label: "Adaptive Card",
@@ -66,46 +123,14 @@ export default function register(api: OpenClawPluginApi) {
       ),
     }),
     async execute(_toolCallId, params) {
-      const p = params as {
-        body: unknown[];
-        actions?: unknown[];
-        fallback_text?: string;
-        template_data?: unknown;
-      };
+      const p = params as AdaptiveCardParams;
 
       if (!Array.isArray(p.body) || p.body.length === 0) {
         return textResult("Error: card body must be a non-empty array of elements.");
       }
 
-      const card: Record<string, unknown> = {
-        type: "AdaptiveCard",
-        version: "1.5",
-        body: p.body,
-      };
-      if (Array.isArray(p.actions) && p.actions.length > 0) {
-        card.actions = p.actions;
-      }
-
-      const cardJson = JSON.stringify(card);
-      const generated = generateFallbackText(p.body);
-      const fallback = p.fallback_text || generated || DEFAULT_FALLBACK;
-      const templateData = p.template_data ?? null;
-
-      // Embed the card JSON between marker tags inside the tool result text.
-      // The text survives gateway sanitization (which only truncates, doesn't strip).
-      // Mobile apps extract the JSON between markers and render natively.
-      // Channels that don't parse markers just show the fallback text.
-      const parts: string[] = [];
-      if (fallback) {
-        parts.push(fallback, "");
-      }
-      parts.push(`${CARD_OPEN_TAG}${cardJson}${CARD_CLOSE_TAG}`);
-      if (templateData) {
-        parts.push(
-          `<!--adaptive-card-data-->${JSON.stringify(templateData)}<!--/adaptive-card-data-->`,
-        );
-      }
-      const markedText = parts.join("\n");
+      const { cardJson, fallback, templateData } = buildCardPayload(p);
+      const markedText = buildMarkedText(cardJson, fallback, templateData);
 
       return {
         content: [{ type: "text" as const, text: markedText }],
@@ -114,18 +139,20 @@ export default function register(api: OpenClawPluginApi) {
     },
   });
 
-  // Command: /acard for quick manual card testing
-  // Named "acard" (not "card") to avoid collision with LINE extension's /card command.
+  // ── Command: /acard ──
+  // Named "acard" (not "card") to avoid collision with other plugins' /card commands.
   api.registerCommand({
     name: "acard",
     description: "Send a test Adaptive Card to verify rendering.",
     acceptsArgs: true,
     handler: async (ctx) => {
       const args = ctx.args?.trim() ?? "";
+
+      // /acard test (or no args) — send a canned test card
       if (args === "test" || !args) {
         const card = {
           type: "AdaptiveCard",
-          version: "1.5",
+          version: AC_VERSION,
           body: [
             { type: "TextBlock", text: "Adaptive Cards Test", weight: "Bolder", size: "Large" },
             {
@@ -133,7 +160,7 @@ export default function register(api: OpenClawPluginApi) {
               facts: [
                 { title: "Platform", value: "OpenClaw" },
                 { title: "Status", value: "Connected" },
-                { title: "Version", value: "1.5" },
+                { title: "Version", value: AC_VERSION },
               ],
             },
             {
@@ -142,14 +169,17 @@ export default function register(api: OpenClawPluginApi) {
               isSubtle: true,
             },
           ],
-          actions: [{ type: "Action.Submit", title: "Confirm", data: { action: "test_confirm" } }],
+          actions: [
+            { type: "Action.Submit", title: "Confirm", data: { action: "test_confirm" } },
+          ],
         };
         const cardJson = JSON.stringify(card);
         return {
           text: `Adaptive Cards test card:\n\n${CARD_OPEN_TAG}${cardJson}${CARD_CLOSE_TAG}`,
         };
       }
-      // Try to parse args as card JSON
+
+      // /acard {json} — send custom card JSON
       try {
         const card = JSON.parse(args);
         if (!card.type || card.type !== "AdaptiveCard") {
@@ -169,92 +199,4 @@ export default function register(api: OpenClawPluginApi) {
       }
     },
   });
-}
-
-/**
- * Generate plain text fallback from card body elements.
- * Handles TextBlock, RichTextBlock, FactSet, ColumnSet, Container, Image, Table,
- * and Input elements. Returns empty string if no text can be extracted.
- */
-function generateFallbackText(body: unknown[]): string {
-  const lines: string[] = [];
-  for (const element of body) {
-    if (!element || typeof element !== "object") continue;
-    const el = element as Record<string, unknown>;
-    const type = typeof el.type === "string" ? el.type : "";
-    switch (type) {
-      case "TextBlock":
-        if (typeof el.text === "string") lines.push(el.text);
-        break;
-      case "RichTextBlock":
-        // RichTextBlock content lives in inlines (TextRun[]), not a top-level text field.
-        if (Array.isArray(el.inlines)) {
-          const texts: string[] = [];
-          for (const inline of el.inlines) {
-            if (typeof inline === "string") {
-              texts.push(inline);
-            } else if (inline && typeof inline === "object") {
-              const run = inline as Record<string, unknown>;
-              if (typeof run.text === "string") texts.push(run.text);
-            }
-          }
-          if (texts.length > 0) lines.push(texts.join(""));
-        }
-        break;
-      case "FactSet":
-        if (Array.isArray(el.facts)) {
-          for (const fact of el.facts) {
-            const f = fact as Record<string, unknown>;
-            if (typeof f.title === "string" && typeof f.value === "string") {
-              lines.push(`${f.title}: ${f.value}`);
-            }
-          }
-        }
-        break;
-      case "ColumnSet":
-        if (Array.isArray(el.columns)) {
-          for (const col of el.columns) {
-            const c = col as Record<string, unknown>;
-            if (Array.isArray(c.items)) {
-              lines.push(generateFallbackText(c.items));
-            }
-          }
-        }
-        break;
-      case "Container":
-        if (Array.isArray(el.items)) {
-          lines.push(generateFallbackText(el.items));
-        }
-        break;
-      case "Image":
-        if (typeof el.altText === "string") lines.push(`[Image: ${el.altText}]`);
-        break;
-      case "Table":
-        if (Array.isArray(el.rows)) {
-          for (const row of el.rows) {
-            const r = row as Record<string, unknown>;
-            if (Array.isArray(r.cells)) {
-              const cellTexts: string[] = [];
-              for (const cell of r.cells) {
-                const c = cell as Record<string, unknown>;
-                if (Array.isArray(c.items)) {
-                  const t = generateFallbackText(c.items);
-                  if (t) cellTexts.push(t);
-                }
-              }
-              if (cellTexts.length > 0) lines.push(cellTexts.join(" | "));
-            }
-          }
-        }
-        break;
-      default:
-        // Input elements: extract label or placeholder as fallback context.
-        if (type.startsWith("Input.")) {
-          if (typeof el.label === "string") lines.push(el.label);
-          else if (typeof el.placeholder === "string") lines.push(`[${el.placeholder}]`);
-        }
-        break;
-    }
-  }
-  return lines.filter(Boolean).join("\n");
 }

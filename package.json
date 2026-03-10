@@ -3,30 +3,57 @@
   "version": "1.0.0",
   "description": "Adaptive Cards plugin for OpenClaw — native structured UI on iOS, Android, Teams, and web",
   "license": "MIT",
-  "author": "Vikrant Singh <vikrant@example.com>",
+  "author": "Vikrant Singh",
   "repository": {
     "type": "git",
     "url": "https://github.com/VikrantSingh01/openclaw-adaptive-cards"
   },
+  "homepage": "https://github.com/VikrantSingh01/openclaw-adaptive-cards#readme",
+  "bugs": {
+    "url": "https://github.com/VikrantSingh01/openclaw-adaptive-cards/issues"
+  },
   "keywords": [
     "openclaw",
+    "openclaw-plugin",
     "adaptive-cards",
-    "plugin",
     "genui",
     "mobile",
-    "teams"
+    "teams",
+    "swiftui",
+    "jetpack-compose"
   ],
   "type": "module",
   "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./constants": "./src/constants.ts",
+    "./fallback": "./src/fallback.ts"
+  },
   "openclaw": {
-    "extensions": ["./src/index.ts"]
+    "extensions": [
+      "./src/index.ts"
+    ]
   },
   "files": [
     "src/",
-    "openclaw.plugin.json"
+    "openclaw.plugin.json",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run test"
+  },
   "dependencies": {
     "@sinclair/typebox": "^0.34.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   },
   "peerDependencies": {
     "openclaw": "*"
