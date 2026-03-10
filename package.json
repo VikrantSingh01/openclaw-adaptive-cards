@@ -1,0 +1,34 @@
+{
+  "name": "@vikrantsingh01/openclaw-adaptive-cards",
+  "version": "1.0.0",
+  "description": "Adaptive Cards plugin for OpenClaw — native structured UI on iOS, Android, Teams, and web",
+  "license": "MIT",
+  "author": "Vikrant Singh <vikrant@example.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VikrantSingh01/openclaw-adaptive-cards"
+  },
+  "keywords": [
+    "openclaw",
+    "adaptive-cards",
+    "plugin",
+    "genui",
+    "mobile",
+    "teams"
+  ],
+  "type": "module",
+  "main": "src/index.ts",
+  "openclaw": {
+    "extensions": ["./src/index.ts"]
+  },
+  "files": [
+    "src/",
+    "openclaw.plugin.json"
+  ],
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.0"
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  }
+}
