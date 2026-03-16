@@ -8,7 +8,7 @@ describe("buildCardPromptGuidance", () => {
     expect(guidance).toContain("Prefer cards over plain text");
     expect(guidance).toContain("When to use cards");
     expect(guidance).toContain("When NOT to use cards");
-    expect(guidance).toContain("Common card patterns");
+    expect(guidance).toContain("Available card patterns");
   });
 
   it("includes translation guidance for translated capability", () => {
@@ -25,18 +25,48 @@ describe("buildCardPromptGuidance", () => {
     expect(guidance).toContain("When to use cards");
   });
 
-  it("always includes common card patterns", () => {
+  it("always includes card patterns for all capabilities", () => {
     for (const cap of ["native", "translated", "fallback"] as const) {
       const guidance = buildCardPromptGuidance(cap);
-      expect(guidance).toContain("Status card");
-      expect(guidance).toContain("Choice picker");
-      expect(guidance).toContain("Data table");
-      expect(guidance).toContain("Progress tracker");
+      expect(guidance).toContain("Available card patterns");
     }
   });
 
   it("starts with ## Adaptive Cards heading", () => {
     const guidance = buildCardPromptGuidance("native");
     expect(guidance.startsWith("## Adaptive Cards")).toBe(true);
+  });
+
+  it("references v1.6 schema", () => {
+    const guidance = buildCardPromptGuidance("native");
+    expect(guidance).toContain("v1.6");
+  });
+
+  it("includes Action.Execute in actions section", () => {
+    const guidance = buildCardPromptGuidance("native");
+    expect(guidance).toContain("Action.Execute");
+    expect(guidance).toContain("Action.ToggleVisibility");
+  });
+
+  it("includes v1.6 elements", () => {
+    const guidance = buildCardPromptGuidance("native");
+    expect(guidance).toContain("CodeBlock");
+    expect(guidance).toContain("Carousel");
+    expect(guidance).toContain("Chart.Bar");
+    expect(guidance).toContain("Rating");
+  });
+
+  it("includes dynamic patterns from MCP library", () => {
+    const guidance = buildCardPromptGuidance("native");
+    // These come from getAllPatterns() in the MCP library
+    expect(guidance).toContain("approval");
+    expect(guidance).toContain("notification");
+    expect(guidance).toContain("dashboard");
+  });
+
+  it("mentions validation and accessibility in preamble", () => {
+    const guidance = buildCardPromptGuidance("native");
+    expect(guidance).toContain("validated");
+    expect(guidance).toContain("accessibility");
   });
 });

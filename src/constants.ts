@@ -20,4 +20,4 @@ export const DATA_CLOSE_TAG = "<!--/adaptive-card-data-->";
 export const DEFAULT_FALLBACK = "(Interactive card \u2014 open on a supported client to view.)";
 
 /** Adaptive Cards schema version used by this plugin. */
-export const AC_VERSION = "1.5";
+export const AC_VERSION = "1.6";

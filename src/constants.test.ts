@@ -30,6 +30,10 @@ describe("constants", () => {
     expect(AC_VERSION).toMatch(/^\d+\.\d+$/);
   });
 
+  it("AC_VERSION is 1.6", () => {
+    expect(AC_VERSION).toBe("1.6");
+  });
+
   it("DEFAULT_FALLBACK is a non-empty string", () => {
     expect(DEFAULT_FALLBACK.length).toBeGreaterThan(0);
   });

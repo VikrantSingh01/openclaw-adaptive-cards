@@ -41,4 +41,25 @@ describe("formatActionAsMessage", () => {
     expect(msg).toContain("[Card action: Confirm]");
     expect(msg).toContain("{}");
   });
+
+  it("includes verb from Action.Execute", () => {
+    const payload: CardActionPayload = {
+      actionData: { decision: "approved" },
+      actionTitle: "Approve",
+      actionVerb: "expense_approve",
+    };
+    const msg = formatActionAsMessage(payload);
+    expect(msg).toContain("[Card action: Approve (verb: expense_approve)]");
+    expect(msg).toContain('"decision": "approved"');
+  });
+
+  it("omits verb when not present", () => {
+    const payload: CardActionPayload = {
+      actionData: { choice: "yes" },
+      actionTitle: "OK",
+    };
+    const msg = formatActionAsMessage(payload);
+    expect(msg).toBe('[Card action: OK]\n{\n  "choice": "yes"\n}');
+    expect(msg).not.toContain("verb");
+  });
 });
