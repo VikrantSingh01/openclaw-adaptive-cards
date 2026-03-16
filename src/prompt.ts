@@ -3,7 +3,12 @@
  *
  * Injected via the `before_prompt_build` hook so the agent understands
  * card capabilities and makes intelligent card-vs-text decisions.
+ *
+ * Layout patterns are dynamically loaded from the adaptive-cards-mcp library
+ * (21 patterns including approval, incident, calendar, PR review, etc.).
  */
+
+import { getAllPatterns } from "./mcp-bridge.js";
 
 /**
  * Build the system prompt appendix based on the current channel's card support level.
@@ -16,6 +21,9 @@ export function buildCardPromptGuidance(capability: "native" | "translated" | "f
     "## Adaptive Cards",
     "",
     "You have the `adaptive_card` tool to render structured, interactive content inline in chat.",
+    "Cards use Adaptive Cards v1.6 schema (https://adaptivecards.io/explorer/).",
+    "Cards are validated against the official schema, checked for accessibility, and",
+    "automatically adapted for the target host (Teams, Outlook, etc.) before delivery.",
     "",
   ];
 
@@ -49,6 +57,8 @@ export function buildCardPromptGuidance(capability: "native" | "translated" | "f
     "- Showing progress or step-by-step status tracking",
     "- Displaying data tables or fact sheets",
     "- Summarizing multi-field results (API responses, search results, dashboards)",
+    "- Approval workflows (approve/reject with Action.Execute for server-side refresh)",
+    "- Collecting user input via forms (Input.Text, Input.ChoiceSet, etc.)",
     "",
     "### When NOT to use cards",
     "",
@@ -57,14 +67,31 @@ export function buildCardPromptGuidance(capability: "native" | "translated" | "f
     "- Code output (use fenced code blocks instead)",
     "- Single-value answers (just reply with text)",
     "",
-    "### Common card patterns",
+    "### Body elements",
     "",
-    "**Status card:** TextBlock header (weight: Bolder) + FactSet for key-value pairs",
-    "**Choice picker:** TextBlock question + Action.Submit buttons with data payloads",
-    "**Data table:** Table element with header row + data rows, or FactSet for simple pairs",
-    "**Progress tracker:** TextBlock steps with checkmark/pending indicators in FactSet",
-    "**Comparison:** ColumnSet with multiple columns, each containing a Container with facts",
+    "**Core:** TextBlock, Image, RichTextBlock, CodeBlock",
+    "**Containers:** Container, ColumnSet, FactSet, ImageSet, Table, ActionSet",
+    "**Advanced:** Carousel, Accordion, TabSet",
+    "**Inputs:** Input.Text, Input.Number, Input.Date, Input.Time, Input.Toggle, Input.ChoiceSet",
+    "**Charts:** Chart.Bar, Chart.Line, Chart.Pie, Chart.Donut (Teams)",
+    "**Other:** Rating, ProgressBar, Badge, Icon, CompoundButton",
+    "",
+    "### Actions",
+    "",
+    "**Action.Execute** — Server-side processing with automatic card refresh (preferred for workflows)",
+    "**Action.Submit** — Client-side data submission (legacy, still widely supported)",
+    "**Action.OpenUrl** — Open a URL in the browser",
+    "**Action.ShowCard** — Reveal a nested card inline (expandable sections)",
+    "**Action.ToggleVisibility** — Show/hide elements by targetElementId",
+    "",
   );
+
+  // Dynamic layout patterns from MCP library
+  const patterns = getAllPatterns();
+  lines.push("### Available card patterns", "");
+  for (const p of patterns) {
+    lines.push(`**${p.name}:** ${p.description}`);
+  }
 
   return lines.join("\n");
 }

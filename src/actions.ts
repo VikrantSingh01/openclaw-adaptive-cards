@@ -9,10 +9,12 @@
 
 /** Payload sent by clients when a card action is tapped. */
 export interface CardActionPayload {
-  /** The action data from Action.Submit (the `data` field from the card JSON). */
+  /** The action data from Action.Submit or Action.Execute (the `data` field from the card JSON). */
   actionData: Record<string, unknown>;
   /** Human-readable label of the button that was tapped. */
   actionTitle?: string;
+  /** The verb from Action.Execute, used for server-side routing. */
+  actionVerb?: string;
   /** Session identifier so the action is routed to the correct agent session. */
   sessionKey?: string;
 }
@@ -25,6 +27,7 @@ export interface CardActionPayload {
  */
 export function formatActionAsMessage(payload: CardActionPayload): string {
   const title = payload.actionTitle ?? "Card action";
+  const verb = payload.actionVerb ? ` (verb: ${payload.actionVerb})` : "";
   const dataStr = JSON.stringify(payload.actionData, null, 2);
-  return `[Card action: ${title}]\n${dataStr}`;
+  return `[Card action: ${title}${verb}]\n${dataStr}`;
 }

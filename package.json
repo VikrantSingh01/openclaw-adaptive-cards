@@ -1,6 +1,6 @@
 {
   "name": "@vikrantsingh01/openclaw-adaptive-cards",
-  "version": "2.0.0",
+  "version": "4.0.0",
   "description": "Adaptive Cards plugin for OpenClaw — native structured UI on iOS, Android, Teams, and web",
   "license": "MIT",
   "author": "Vikrant Singh",
@@ -49,7 +49,8 @@
     "check": "npm run typecheck && npm run test"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.0"
+    "@sinclair/typebox": "^0.34.0",
+    "adaptive-cards-mcp": "file:../adaptive-cards-mcp/packages/core"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

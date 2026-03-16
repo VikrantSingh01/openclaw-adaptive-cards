@@ -11,14 +11,44 @@ import {
 import { generateFallbackText } from "./fallback.js";
 import { buildCardPromptGuidance } from "./prompt.js";
 import { formatActionAsMessage } from "./actions.js";
+import {
+  validateCard,
+  checkHostCompatibility,
+  adaptCardForHost,
+  checkCardAccessibility,
+} from "./mcp-bridge.js";
 import type { CardActionPayload } from "./actions.js";
 
-// Re-export public API for consumers that parse markers themselves
+// Re-export public API — plugin-specific modules
 export { CARD_CLOSE_TAG, CARD_OPEN_TAG, DATA_CLOSE_TAG, DATA_OPEN_TAG } from "./constants.js";
 export { generateFallbackText } from "./fallback.js";
 export { buildCardPromptGuidance } from "./prompt.js";
 export { formatActionAsMessage } from "./actions.js";
 export type { CardActionPayload } from "./actions.js";
+
+// Re-export MCP-powered modules via bridge
+export {
+  validateCard,
+  checkHostCompatibility,
+  adaptCardForHost,
+  checkCardAccessibility,
+  analyzeCard,
+  getValidElementTypes,
+  getValidActionTypes,
+  getAllPatterns,
+} from "./mcp-bridge.js";
+export type {
+  ValidationResult,
+  ValidationIssue,
+  CompatibilityResult,
+  CompatibilityIssue,
+  HostApp,
+  ValidationError,
+  AccessibilityReport,
+  HostCompatibilityReport,
+  LayoutPattern,
+  CardStats,
+} from "./mcp-bridge.js";
 
 /** Shape of the tool params after type-assertion. */
 interface AdaptiveCardParams {
@@ -36,8 +66,8 @@ function textResult(text: string) {
 }
 
 /**
- * Assemble a full AdaptiveCard v1.5 envelope from tool params.
- * Returns the JSON string and the computed fallback text.
+ * Assemble a full AdaptiveCard v1.6 envelope from tool params.
+ * Returns the card object, JSON string, and the computed fallback text.
  */
 function buildCardPayload(params: AdaptiveCardParams) {
   const card: Record<string, unknown> = {
@@ -54,15 +84,11 @@ function buildCardPayload(params: AdaptiveCardParams) {
   const fallback = params.fallback_text || generated || DEFAULT_FALLBACK;
   const templateData = params.template_data ?? null;
 
-  return { cardJson, fallback, templateData };
+  return { card, cardJson, fallback, templateData };
 }
 
 /**
  * Embed card JSON between marker tags inside tool result text.
- *
- * The text survives gateway sanitization (which only truncates, doesn't strip).
- * Mobile apps extract the JSON between markers and render natively.
- * Channels that don't parse markers just show the fallback text.
  */
 function buildMarkedText(cardJson: string, fallback: string, templateData: unknown): string {
   const parts: string[] = [];
@@ -78,19 +104,16 @@ function buildMarkedText(cardJson: string, fallback: string, templateData: unkno
 
 /**
  * Detect the card capability level from channel metadata.
- * Returns "native", "translated", or "fallback" based on the channel type.
  */
 function detectCardCapability(
   channel?: string,
   capabilities?: Record<string, unknown>,
 ): "native" | "translated" | "fallback" {
-  // Explicit capability declaration takes precedence
   if (capabilities?.adaptiveCards === "native") return "native";
   if (capabilities?.adaptiveCards === "translated") return "translated";
   if (capabilities?.adaptiveCards === false) return "fallback";
 
-  // Infer from channel type when explicit capability is absent
-  if (!channel) return "native"; // default (web/mobile chat)
+  if (!channel) return "native";
   const ch = channel.toLowerCase();
   if (["ios", "android", "web", "macos"].includes(ch)) return "native";
   if (["msteams", "teams", "webex"].includes(ch)) return "native";
@@ -98,8 +121,22 @@ function detectCardCapability(
   return "fallback";
 }
 
+/**
+ * Map channel name to host identifier for compatibility checking.
+ */
+function channelToHost(channel?: string): string | undefined {
+  if (!channel) return undefined;
+  const ch = channel.toLowerCase();
+  if (["msteams", "teams"].includes(ch)) return "teams";
+  if (["outlook"].includes(ch)) return "outlook";
+  if (["webchat", "web"].includes(ch)) return "webchat";
+  if (["webex"].includes(ch)) return "webex";
+  if (["viva"].includes(ch)) return "viva-connections";
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
-// Tool description with embedded card pattern examples
+// Tool description
 // ---------------------------------------------------------------------------
 
 const TOOL_DESCRIPTION = [
@@ -109,20 +146,25 @@ const TOOL_DESCRIPTION = [
   "The card renders natively on iOS (SwiftUI), Android (Jetpack Compose),",
   "Teams (Bot Framework), and web. Other channels see fallback text.",
   "",
-  "Card schema: Adaptive Cards v1.5 (https://adaptivecards.io/explorer/)",
+  "Card schema: Adaptive Cards v1.6 (https://adaptivecards.io/explorer/)",
   "",
-  "Body elements: TextBlock, RichTextBlock, ColumnSet, Container, FactSet,",
-  "Image, ImageSet, Table, ActionSet, Input.Text, Input.Number, Input.Date,",
-  "Input.Time, Input.Toggle, Input.ChoiceSet.",
+  "Body elements: TextBlock, RichTextBlock, CodeBlock, ColumnSet, Container, FactSet,",
+  "Image, ImageSet, Table, ActionSet, Carousel, Accordion, TabSet,",
+  "Input.Text, Input.Number, Input.Date, Input.Time, Input.Toggle, Input.ChoiceSet,",
+  "Chart.Bar, Chart.Line, Chart.Pie, Chart.Donut, Rating, ProgressBar, Badge, Icon.",
   "",
-  "Actions: Action.Submit, Action.OpenUrl, Action.ShowCard.",
+  "Actions: Action.Execute (preferred — server-side with card refresh),",
+  "Action.Submit, Action.OpenUrl, Action.ShowCard, Action.ToggleVisibility.",
   "",
   "Common patterns:",
   '- Status card: TextBlock (weight:"Bolder") + FactSet with key-value facts',
-  '- Choice picker: TextBlock question + Action.Submit buttons with data payloads',
-  '- Data table: FactSet for simple pairs, or Table for multi-column data',
+  '- Choice picker: TextBlock question + Action.Execute buttons with data payloads',
+  '- Data table: Table with header row + data rows, or FactSet for simple pairs',
   '- Progress tracker: FactSet with step names and status values (Done/Pending/In Progress)',
   '- Comparison: ColumnSet with columns, each containing a Container with FactSet',
+  '- Approval workflow: Header + details + Action.Execute (Approve/Reject) with verb',
+  '- Input form: Input.Text/ChoiceSet + Action.Submit to collect data',
+  '- Incident alert: Severity header + impact facts + Acknowledge/Escalate actions',
 ].join("\n");
 
 // ---------------------------------------------------------------------------
@@ -130,16 +172,14 @@ const TOOL_DESCRIPTION = [
 // ---------------------------------------------------------------------------
 
 export default function register(api: OpenClawPluginApi) {
+  let currentChannel: string | undefined;
+
   // ── Hook: before_prompt_build ──
-  // Inject card usage guidance into the system prompt so the agent makes
-  // intelligent decisions about when to use cards vs plain text.
-  // Inject card usage guidance into the system prompt.
-  // Cast handler to satisfy InternalHookHandler — the event shape includes
-  // channel and capabilities at runtime but the base type is narrower.
   const promptHook = async (event: unknown) => {
     const e = event as Record<string, unknown>;
     const channel = e.channel as string | undefined;
     const capabilities = e.capabilities as Record<string, unknown> | undefined;
+    currentChannel = channel;
     const capability = detectCardCapability(channel, capabilities);
     return { appendSystemContext: buildCardPromptGuidance(capability) };
   };
@@ -161,8 +201,8 @@ export default function register(api: OpenClawPluginApi) {
       actions: Type.Optional(
         Type.Array(Type.Unknown(), {
           description:
-            "Array of card actions (buttons). " +
-            'Example: [{ "type": "Action.Submit", "title": "Approve", "data": { "choice": "yes" } }]',
+            "Array of card actions (buttons). Prefer Action.Execute for workflows (supports card refresh). " +
+            'Example: [{ "type": "Action.Execute", "title": "Approve", "verb": "approve", "data": { "choice": "yes" } }]',
         }),
       ),
       fallback_text: Type.Optional(
@@ -187,26 +227,66 @@ export default function register(api: OpenClawPluginApi) {
         return textResult("Error: card body must be a non-empty array of elements.");
       }
 
-      const { cardJson, fallback, templateData } = buildCardPayload(p);
+      // Validate card structure (powered by MCP's AJV schema validator)
+      const validation = validateCard(p.body, p.actions);
+      if (!validation.valid) {
+        const errorMsgs = validation.errors.map((e) => `- ${e.message}${e.path ? ` (at ${e.path})` : ""}`);
+        return textResult(`Card validation failed:\n${errorMsgs.join("\n")}\n\nFix the errors and try again.`);
+      }
+
+      // Accessibility check (powered by MCP's accessibility checker)
+      const accessibility = checkCardAccessibility(p.body, p.actions);
+
+      // Check host compatibility and auto-adapt if needed
+      let body = p.body;
+      let actions = p.actions;
+      const host = channelToHost(currentChannel);
+      let compatNote: string | undefined;
+
+      if (host) {
+        const compat = checkHostCompatibility(body, actions, host);
+        if (!compat.compatible || compat.issues.length > 0) {
+          const adapted = adaptCardForHost(body, actions, host);
+          body = adapted.body;
+          actions = adapted.actions;
+          const changeCount = adapted.changes.length;
+          compatNote = `Card adapted for ${compat.host} (${changeCount} change${changeCount !== 1 ? "s" : ""}).`;
+        }
+      }
+
+      const adaptedParams: AdaptiveCardParams = { ...p, body, actions };
+      const { card, cardJson, fallback, templateData } = buildCardPayload(adaptedParams);
       const markedText = buildMarkedText(cardJson, fallback, templateData);
 
       return {
         content: [{ type: "text" as const, text: markedText }],
-        details: { adaptiveCard: cardJson, templateData },
+        details: {
+          adaptiveCard: card,
+          templateData: templateData ?? undefined,
+          validation: {
+            elementCount: validation.elementCount,
+            actionCount: validation.actionCount,
+            warnings: validation.warnings.length,
+          },
+          accessibility: {
+            score: accessibility.score,
+            issues: accessibility.issues.length,
+          },
+          ...(compatNote ? { hostAdaptation: compatNote } : {}),
+        },
       };
     },
   });
 
   // ── Command: /acard ──
-  // Named "acard" (not "card") to avoid collision with other plugins' /card commands.
   api.registerCommand({
     name: "acard",
-    description: "Send a test Adaptive Card or validate card JSON.",
+    description: "Send a test Adaptive Card, validate card JSON, or check host compatibility.",
     acceptsArgs: true,
     handler: async (ctx) => {
       const args = ctx.args?.trim() ?? "";
 
-      // /acard test (or no args) — send a canned test card
+      // /acard test (or no args)
       if (args === "test" || !args) {
         const card = {
           type: "AdaptiveCard",
@@ -228,7 +308,7 @@ export default function register(api: OpenClawPluginApi) {
             },
           ],
           actions: [
-            { type: "Action.Submit", title: "Confirm", data: { action: "test_confirm" } },
+            { type: "Action.Execute", title: "Confirm", verb: "test_confirm", data: { action: "test_confirm" } },
           ],
         };
         const cardJson = JSON.stringify(card);
@@ -237,7 +317,7 @@ export default function register(api: OpenClawPluginApi) {
         };
       }
 
-      // /acard validate <json> — validate card JSON structure
+      // /acard validate <json>
       if (args.startsWith("validate ")) {
         const jsonStr = args.slice(9).trim();
         try {
@@ -250,15 +330,69 @@ export default function register(api: OpenClawPluginApi) {
           if (card.actions && !Array.isArray(card.actions)) errors.push('"actions" must be an array');
 
           if (errors.length > 0) {
-            return { text: `Validation errors:\n${errors.map((e) => `- ${e}`).join("\n")}` };
+            return { text: `Envelope errors:\n${errors.map((e) => `- ${e}`).join("\n")}` };
           }
-          return { text: `Card is valid. ${card.body.length} body element(s), ${card.actions?.length ?? 0} action(s).` };
+
+          // Deep validation via MCP
+          const result = validateCard(card.body, card.actions);
+          const accessibility = checkCardAccessibility(card.body, card.actions);
+          const lines: string[] = [];
+          lines.push(
+            `Card structure: ${result.valid ? "Valid" : "Invalid"}`,
+            `Elements: ${result.elementCount}, Actions: ${result.actionCount}`,
+            `Accessibility score: ${accessibility.score}/100`,
+          );
+          if (result.errors.length > 0) {
+            lines.push("", "Errors:");
+            for (const e of result.errors) {
+              lines.push(`  - ${e.message}${e.path ? ` (${e.path})` : ""}`);
+            }
+          }
+          if (result.warnings.length > 0) {
+            lines.push("", "Warnings:");
+            for (const w of result.warnings) {
+              lines.push(`  - ${w.message}${w.path ? ` (${w.path})` : ""}`);
+            }
+          }
+          if (accessibility.issues.length > 0) {
+            lines.push("", "Accessibility issues:");
+            for (const issue of accessibility.issues) {
+              lines.push(`  - ${issue}`);
+            }
+          }
+          return { text: lines.join("\n") };
         } catch {
           return { text: "Invalid JSON. Could not parse the card." };
         }
       }
 
-      // /acard {json} — send custom card JSON
+      // /acard compat <host> <json>
+      if (args.startsWith("compat ")) {
+        const rest = args.slice(7).trim();
+        const spaceIdx = rest.indexOf(" ");
+        if (spaceIdx === -1) {
+          return { text: "Usage: /acard compat <host> <card-json>\nHosts: teams, outlook, webchat, windows, viva, webex" };
+        }
+        const host = rest.slice(0, spaceIdx).trim();
+        const jsonStr = rest.slice(spaceIdx + 1).trim();
+        try {
+          const card = JSON.parse(jsonStr);
+          const result = checkHostCompatibility(card.body ?? [], card.actions, host);
+          const lines: string[] = [`Host: ${result.host}`, `Compatible: ${result.compatible ? "Yes" : "No"}`];
+          if (result.issues.length > 0) {
+            lines.push("", "Issues:");
+            for (const issue of result.issues) {
+              lines.push(`  - [${issue.severity}] ${issue.message}`);
+              if (issue.suggestion) lines.push(`    Suggestion: ${issue.suggestion}`);
+            }
+          }
+          return { text: lines.join("\n") };
+        } catch {
+          return { text: "Invalid JSON. Could not parse the card." };
+        }
+      }
+
+      // /acard {json}
       try {
         const card = JSON.parse(args);
         if (!card.type || card.type !== "AdaptiveCard") {
@@ -269,11 +403,14 @@ export default function register(api: OpenClawPluginApi) {
       } catch {
         return {
           text: [
-            "Usage: /acard [test | validate <json> | <card-json>]",
+            "Usage: /acard [test | validate <json> | compat <host> <json> | <card-json>]",
             "",
-            "/acard test            - Send a test card to verify rendering",
-            "/acard validate {...}  - Validate card JSON structure",
-            "/acard {...}           - Send a custom Adaptive Card JSON",
+            "/acard test                      - Send a test card to verify rendering",
+            "/acard validate {...}            - Validate card JSON + accessibility score",
+            "/acard compat teams {...}        - Check card compatibility with a host",
+            "/acard {...}                     - Send a custom Adaptive Card JSON",
+            "",
+            "Hosts: teams, outlook, webchat, windows, viva, webex",
           ].join("\n"),
         };
       }
@@ -281,8 +418,6 @@ export default function register(api: OpenClawPluginApi) {
   });
 
   // ── Gateway Method: adaptive_cards.action ──
-  // Clients call this when a user taps an Action.Submit button on a rendered card.
-  // The action data is formatted as a follow-up message for the agent to process.
   if (typeof api.registerGatewayMethod === "function") {
     api.registerGatewayMethod(
       "adaptive_cards.action",
@@ -293,7 +428,7 @@ export default function register(api: OpenClawPluginApi) {
           return;
         }
         const message = formatActionAsMessage(payload);
-        ctx.respond(true, { message, actionData: payload.actionData });
+        ctx.respond(true, { message, actionData: payload.actionData, verb: payload.actionVerb });
       },
     );
   }

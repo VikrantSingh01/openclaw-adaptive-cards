@@ -120,4 +120,110 @@ describe("generateFallbackText", () => {
     const body = [null, undefined, "string", 42, { type: "TextBlock", text: "Valid" }];
     expect(generateFallbackText(body as unknown[])).toBe("Valid");
   });
+
+  // --- v1.6 element tests ---
+
+  it("extracts CodeBlock content", () => {
+    const body = [{ type: "CodeBlock", codeSnippet: "console.log('hello')" }];
+    expect(generateFallbackText(body)).toBe("```\nconsole.log('hello')\n```");
+  });
+
+  it("extracts Carousel page content", () => {
+    const body = [
+      {
+        type: "Carousel",
+        pages: [
+          { items: [{ type: "TextBlock", text: "Page 1" }] },
+          { items: [{ type: "TextBlock", text: "Page 2" }] },
+        ],
+      },
+    ];
+    expect(generateFallbackText(body)).toBe("Page 1\nPage 2");
+  });
+
+  it("extracts Accordion items", () => {
+    const body = [
+      {
+        type: "Accordion",
+        items: [
+          {
+            title: "Section 1",
+            card: { body: [{ type: "TextBlock", text: "Content 1" }] },
+          },
+        ],
+      },
+    ];
+    expect(generateFallbackText(body)).toBe("Section 1\nContent 1");
+  });
+
+  it("extracts TabSet tabs", () => {
+    const body = [
+      {
+        type: "TabSet",
+        tabs: [
+          {
+            title: "Overview",
+            card: { body: [{ type: "TextBlock", text: "Overview content" }] },
+          },
+          {
+            title: "Details",
+            card: { body: [{ type: "TextBlock", text: "Detail content" }] },
+          },
+        ],
+      },
+    ];
+    expect(generateFallbackText(body)).toBe("[Overview]\nOverview content\n[Details]\nDetail content");
+  });
+
+  it("extracts Chart data", () => {
+    const body = [
+      {
+        type: "Chart.Bar",
+        title: "Revenue",
+        data: [
+          { label: "Q1", value: 100 },
+          { label: "Q2", value: 200 },
+        ],
+      },
+    ];
+    expect(generateFallbackText(body)).toBe("Revenue\nQ1: 100\nQ2: 200");
+  });
+
+  it("extracts Rating as stars", () => {
+    const body = [{ type: "Rating", value: 3, max: 5 }];
+    expect(generateFallbackText(body)).toBe("Rating: ★★★☆☆");
+  });
+
+  it("extracts ProgressBar with label", () => {
+    const body = [{ type: "ProgressBar", label: "Upload: 75%" }];
+    expect(generateFallbackText(body)).toBe("Upload: 75%");
+  });
+
+  it("extracts ProgressBar without label", () => {
+    const body = [{ type: "ProgressBar", value: "60" }];
+    expect(generateFallbackText(body)).toBe("Progress: 60%");
+  });
+
+  it("extracts CompoundButton title and description", () => {
+    const body = [{ type: "CompoundButton", title: "Upload", description: "Upload a file from your device" }];
+    expect(generateFallbackText(body)).toBe("Upload\nUpload a file from your device");
+  });
+
+  it("extracts Badge text", () => {
+    const body = [{ type: "Badge", text: "New" }];
+    expect(generateFallbackText(body)).toBe("[New]");
+  });
+
+  it("extracts ImageSet altText", () => {
+    const body = [
+      {
+        type: "ImageSet",
+        images: [
+          { altText: "Photo 1" },
+          { altText: "Photo 2" },
+        ],
+      },
+    ];
+    expect(generateFallbackText(body)).toBe("[Image: Photo 1]\n[Image: Photo 2]");
+  });
 });
