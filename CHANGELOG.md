@@ -1,5 +1,48 @@
 # Changelog
 
+## 4.1.0
+
+### Sync with adaptive-cards-mcp v2.3.0
+
+Full alignment with the MCP server's latest capabilities (9 tools, 924 tests, 36 examples).
+
+### New Bridge Functions
+
+- **Card persistence:** `storeCard()` / `getCard()` / `listCards()` — session-scoped card storage with 30-min TTL, returns `cardId` (format: `card-{uuid}`) for subsequent optimize/validate calls
+- **Preview generation:** `writePreviewFile()` — generates HTML preview file with embedded card JSON, returns `file://` URL
+- **Duplicate ID detection:** `findDuplicateIds()` — checks for duplicate element IDs (critical for Action.ToggleVisibility targets)
+- **Pattern scoring:** `scorePatterns()` — ranks all 21 patterns against a natural language description
+- **Pattern lookup:** `findPatternByName()` / `findPatternByIntent()` — direct pattern retrieval
+- **Host queries:** `getAllHostSupport()` / `getHostSupport()` — programmatic access to the 7-host compatibility matrix
+- **High-level tool handlers:** `generateCard()`, `validateCardFull()`, `optimizeCard()`, `dataToCard()`, `suggestLayout()` — pass-through to MCP's 9 tool handlers for programmatic use
+
+### Tool Enhancements
+
+- **cardId tracking:** Every card emitted now gets a session-persistent `cardId` in `details.cardId`
+- **Preview URL:** Tool result `details.previewUrl` contains a `file://` URL to preview the card in the Adaptive Cards Designer
+- **Duplicate ID warnings:** `details.validation.duplicateIds` reported when duplicate element IDs detected
+- **Tool description updated:** References 9 MCP tools, 924 tests, additional elements (Input.Rating, Input.DataGrid, Chart.HorizontalBar, ProgressRing, Spinner, List, Icon)
+
+### Fallback Text
+
+- **Icon:** Extracts `name` as `[IconName]`
+- **List:** Extracts item titles as `- title` with optional subtitle
+- **ActionSet:** Extracts button titles as `[Title]` (was previously skipped)
+
+### Prompt Guidance
+
+- **Accessibility best practices section:** WCAG scoring guidance (altText, label, wrap, speak, title)
+- **Host compatibility matrix:** Dynamic host constraints injected into native channel prompts
+- **Action.Execute verb guidance:** Explains routing via verb and card refresh capability
+- **Additional elements referenced:** Input.Rating, Input.DataGrid, Chart.HorizontalBar, ProgressRing, Spinner, List, Icon
+- **Pattern count in heading:** "Available card patterns (21)"
+
+### New Exports (TypeScript Types)
+
+- `GenerateCardInput`, `ValidateCardInput`, `OptimizeCardInput`, `DataToCardInput`, `SuggestLayoutInput`
+- `GenerateCardOutput`, `OptimizeCardOutput`, `SuggestLayoutOutput`
+- `CardIntent`, `HostVersionSupport`
+
 ## 4.0.0
 
 ### Architecture: MCP Server as Shared Core

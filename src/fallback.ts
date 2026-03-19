@@ -217,6 +217,29 @@ export function generateFallbackText(body: unknown[]): string {
         }
         break;
 
+      case "Icon":
+        if (typeof el.name === "string") lines.push(`[${el.name}]`);
+        break;
+
+      case "List":
+        if (Array.isArray(el.items)) {
+          for (const item of el.items) {
+            const li = item as Record<string, unknown>;
+            if (typeof li.title === "string") lines.push(`- ${li.title}`);
+            if (typeof li.subtitle === "string") lines.push(`  ${li.subtitle}`);
+          }
+        }
+        break;
+
+      case "ActionSet":
+        if (Array.isArray(el.actions)) {
+          for (const action of el.actions) {
+            const a = action as Record<string, unknown>;
+            if (typeof a.title === "string") lines.push(`[${a.title}]`);
+          }
+        }
+        break;
+
       default:
         // Input elements: extract label or placeholder as fallback context.
         if (type.startsWith("Input.")) {

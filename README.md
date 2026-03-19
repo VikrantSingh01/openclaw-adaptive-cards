@@ -2,7 +2,7 @@
 
 Adaptive Cards plugin for [OpenClaw](https://openclaw.ai) — gives the AI an `adaptive_card` tool to respond with native [Adaptive Cards](https://adaptivecards.io/) (v1.6) instead of plain text.
 
-Powered by [adaptive-cards-mcp](https://github.com/VikrantSingh01/adaptive-cards-mcp) for schema validation, host compatibility, accessibility scoring, and 21 layout patterns.
+Powered by [adaptive-cards-mcp](https://github.com/VikrantSingh01/adaptive-cards-mcp) (v2.3.0) — 9 tools, 924 tests, 21 layout patterns, schema validation, host compatibility, and accessibility scoring.
 
 Cards render natively on:
 - **iOS** — SwiftUI via [AdaptiveCards-Mobile](https://github.com/VikrantSingh01/AdaptiveCards-Mobile)
@@ -85,10 +85,10 @@ Project Status: Deploy API (done), Write tests (in progress).     ← FALLBACK T
 ### Plugin Layers
 
 ```
-src/index.ts          ← Plugin registration: tool, hook, command, gateway method
-src/mcp-bridge.ts     ← Adapter: bridges plugin API to adaptive-cards-mcp library
-src/prompt.ts         ← System prompt injection with 21 dynamic layout patterns
-src/fallback.ts       ← Recursive card body → plain text extraction (v1.6 elements)
+src/index.ts          ← Plugin registration: tool, hook, command, gateway method, cardId + preview
+src/mcp-bridge.ts     ← Bridge: 25+ functions from adaptive-cards-mcp (validation, patterns, persistence, tools)
+src/prompt.ts         ← System prompt injection with 21 patterns, host matrix, accessibility guidance
+src/fallback.ts       ← Recursive card body → plain text extraction (30+ v1.6 element types)
 src/actions.ts        ← Action.Execute/Submit routing from client taps
 src/constants.ts      ← Marker tags, AC version, defaults
 ```
@@ -100,11 +100,14 @@ The plugin delegates to `adaptive-cards-mcp` for:
 | Capability | Description |
 |---|---|
 | **Schema validation** | AJV-based validation against the official 3,297-line v1.6 JSON Schema |
-| **Host compatibility** | Checks cards against 6 hosts (Teams, Outlook, Web Chat, Windows, Viva, Webex) |
+| **Host compatibility** | Checks cards against 7 hosts (Generic, Teams, Outlook, Web Chat, Windows, Viva, Webex) |
 | **Card adaptation** | Replaces unsupported elements (Table→ColumnSet, Carousel→Container, Charts→FactSet, Action.Execute→Submit) |
 | **Accessibility** | WCAG scoring (0-100) checking altText, labels, wrap, speak property |
 | **Layout patterns** | 21 production-ready card templates (approval, incident, calendar, PR review, etc.) |
-| **Card analysis** | Element counts, nesting depth, templating detection |
+| **Card analysis** | Element counts, nesting depth, templating detection, duplicate ID detection |
+| **Card persistence** | Session-scoped storage (30-min TTL) with cardId for subsequent optimize/validate calls |
+| **Preview generation** | HTML preview file for Adaptive Cards Designer |
+| **9 tool handlers** | generateCard, validateCardFull, dataToCard, optimizeCard, templateCard, transformCard, suggestLayout, generateAndValidate, cardWorkflow |
 
 ### Design Decisions
 
@@ -217,15 +220,36 @@ import {
   formatActionAsMessage,
   CARD_OPEN_TAG, CARD_CLOSE_TAG,
 
-  // MCP-powered (via bridge)
+  // MCP-powered core (via bridge)
   validateCard,
   checkHostCompatibility,
   adaptCardForHost,
   checkCardAccessibility,
   analyzeCard,
+  findDuplicateIds,
   getValidElementTypes,
   getValidActionTypes,
+
+  // Patterns & hosts
   getAllPatterns,
+  scorePatterns,
+  findPatternByName,
+  findPatternByIntent,
+  getAllHostSupport,
+  getHostSupport,
+
+  // Card persistence & preview
+  storeCard,
+  getCard,
+  listCards,
+  writePreviewFile,
+
+  // High-level MCP tool handlers
+  generateCard,
+  validateCardFull,
+  optimizeCard,
+  dataToCard,
+  suggestLayout,
 } from "@vikrantsingh01/openclaw-adaptive-cards";
 ```
 
