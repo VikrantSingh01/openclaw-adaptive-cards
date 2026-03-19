@@ -16,6 +16,9 @@ import {
   checkHostCompatibility,
   adaptCardForHost,
   checkCardAccessibility,
+  storeCard,
+  writePreviewFile,
+  findDuplicateIds,
 } from "./mcp-bridge.js";
 import type { CardActionPayload } from "./actions.js";
 
@@ -33,9 +36,24 @@ export {
   adaptCardForHost,
   checkCardAccessibility,
   analyzeCard,
+  findDuplicateIds,
   getValidElementTypes,
   getValidActionTypes,
   getAllPatterns,
+  scorePatterns,
+  findPatternByName,
+  findPatternByIntent,
+  getAllHostSupport,
+  getHostSupport,
+  storeCard,
+  getCard,
+  listCards,
+  writePreviewFile,
+  generateCard,
+  validateCardFull,
+  optimizeCard,
+  dataToCard,
+  suggestLayout,
 } from "./mcp-bridge.js";
 export type {
   ValidationResult,
@@ -48,6 +66,16 @@ export type {
   HostCompatibilityReport,
   LayoutPattern,
   CardStats,
+  GenerateCardInput,
+  ValidateCardInput,
+  OptimizeCardInput,
+  DataToCardInput,
+  SuggestLayoutInput,
+  GenerateCardOutput,
+  OptimizeCardOutput,
+  SuggestLayoutOutput,
+  CardIntent,
+  HostVersionSupport,
 } from "./mcp-bridge.js";
 
 /** Shape of the tool params after type-assertion. */
@@ -147,11 +175,14 @@ const TOOL_DESCRIPTION = [
   "Teams (Bot Framework), and web. Other channels see fallback text.",
   "",
   "Card schema: Adaptive Cards v1.6 (https://adaptivecards.io/explorer/)",
+  "Powered by adaptive-cards-mcp: 9 tools, 21 patterns, 924 tests.",
   "",
   "Body elements: TextBlock, RichTextBlock, CodeBlock, ColumnSet, Container, FactSet,",
-  "Image, ImageSet, Table, ActionSet, Carousel, Accordion, TabSet,",
+  "Image, ImageSet, Table, ActionSet, List, Carousel, Accordion, TabSet,",
   "Input.Text, Input.Number, Input.Date, Input.Time, Input.Toggle, Input.ChoiceSet,",
-  "Chart.Bar, Chart.Line, Chart.Pie, Chart.Donut, Rating, ProgressBar, Badge, Icon.",
+  "Input.Rating, Input.DataGrid,",
+  "Chart.Bar, Chart.Line, Chart.Pie, Chart.Donut, Chart.HorizontalBar,",
+  "Rating, ProgressBar, ProgressRing, Spinner, Badge, Icon, CompoundButton.",
   "",
   "Actions: Action.Execute (preferred — server-side with card refresh),",
   "Action.Submit, Action.OpenUrl, Action.ShowCard, Action.ToggleVisibility.",
@@ -165,6 +196,8 @@ const TOOL_DESCRIPTION = [
   '- Approval workflow: Header + details + Action.Execute (Approve/Reject) with verb',
   '- Input form: Input.Text/ChoiceSet + Action.Submit to collect data',
   '- Incident alert: Severity header + impact facts + Acknowledge/Escalate actions',
+  '- Dashboard: ColumnSet with metric containers, optional charts',
+  '- Profile card: Image + ColumnSet with name/title/department + contact actions',
 ].join("\n");
 
 // ---------------------------------------------------------------------------
@@ -181,7 +214,8 @@ export default function register(api: OpenClawPluginApi) {
     const capabilities = e.capabilities as Record<string, unknown> | undefined;
     currentChannel = channel;
     const capability = detectCardCapability(channel, capabilities);
-    return { appendSystemContext: buildCardPromptGuidance(capability) };
+    const host = channelToHost(channel);
+    return { appendSystemContext: buildCardPromptGuidance(capability, host) };
   };
   api.registerHook("before_prompt_build", promptHook as unknown as Parameters<typeof api.registerHook>[1], {
     name: "adaptive-cards.prompt-guidance",
@@ -234,6 +268,9 @@ export default function register(api: OpenClawPluginApi) {
         return textResult(`Card validation failed:\n${errorMsgs.join("\n")}\n\nFix the errors and try again.`);
       }
 
+      // Check for duplicate IDs (important for ToggleVisibility)
+      const dupeIds = findDuplicateIds(p.body, p.actions);
+
       // Accessibility check (powered by MCP's accessibility checker)
       const accessibility = checkCardAccessibility(p.body, p.actions);
 
@@ -258,21 +295,40 @@ export default function register(api: OpenClawPluginApi) {
       const { card, cardJson, fallback, templateData } = buildCardPayload(adaptedParams);
       const markedText = buildMarkedText(cardJson, fallback, templateData);
 
+      // Store card for session persistence (cardId enables subsequent optimize/validate calls)
+      let cardId: string | undefined;
+      try {
+        cardId = storeCard(body, actions, { channel: currentChannel, host });
+      } catch {
+        // Card store failure is non-fatal
+      }
+
+      // Generate preview URL
+      let previewUrl: string | undefined;
+      try {
+        previewUrl = writePreviewFile(body, actions);
+      } catch {
+        // Preview generation failure is non-fatal
+      }
+
       return {
         content: [{ type: "text" as const, text: markedText }],
         details: {
           adaptiveCard: card,
+          cardId,
           templateData: templateData ?? undefined,
           validation: {
             elementCount: validation.elementCount,
             actionCount: validation.actionCount,
             warnings: validation.warnings.length,
+            ...(dupeIds.length > 0 ? { duplicateIds: dupeIds } : {}),
           },
           accessibility: {
             score: accessibility.score,
             issues: accessibility.issues.length,
           },
           ...(compatNote ? { hostAdaptation: compatNote } : {}),
+          ...(previewUrl ? { previewUrl } : {}),
         },
       };
     },
@@ -305,6 +361,7 @@ export default function register(api: OpenClawPluginApi) {
               type: "TextBlock",
               text: "If you see this as a native card, rendering works.",
               isSubtle: true,
+              wrap: true,
             },
           ],
           actions: [
@@ -336,12 +393,16 @@ export default function register(api: OpenClawPluginApi) {
           // Deep validation via MCP
           const result = validateCard(card.body, card.actions);
           const accessibility = checkCardAccessibility(card.body, card.actions);
+          const dupeIds = findDuplicateIds(card.body, card.actions);
           const lines: string[] = [];
           lines.push(
             `Card structure: ${result.valid ? "Valid" : "Invalid"}`,
             `Elements: ${result.elementCount}, Actions: ${result.actionCount}`,
             `Accessibility score: ${accessibility.score}/100`,
           );
+          if (dupeIds.length > 0) {
+            lines.push(`Duplicate IDs: ${dupeIds.join(", ")}`);
+          }
           if (result.errors.length > 0) {
             lines.push("", "Errors:");
             for (const e of result.errors) {
@@ -373,11 +434,11 @@ export default function register(api: OpenClawPluginApi) {
         if (spaceIdx === -1) {
           return { text: "Usage: /acard compat <host> <card-json>\nHosts: teams, outlook, webchat, windows, viva, webex" };
         }
-        const host = rest.slice(0, spaceIdx).trim();
+        const hostArg = rest.slice(0, spaceIdx).trim();
         const jsonStr = rest.slice(spaceIdx + 1).trim();
         try {
           const card = JSON.parse(jsonStr);
-          const result = checkHostCompatibility(card.body ?? [], card.actions, host);
+          const result = checkHostCompatibility(card.body ?? [], card.actions, hostArg);
           const lines: string[] = [`Host: ${result.host}`, `Compatible: ${result.compatible ? "Yes" : "No"}`];
           if (result.issues.length > 0) {
             lines.push("", "Issues:");

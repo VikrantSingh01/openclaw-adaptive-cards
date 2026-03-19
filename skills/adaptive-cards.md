@@ -1,10 +1,12 @@
 ---
-description: "Card templates and patterns for the adaptive_card tool"
+description: "Card templates and patterns for the adaptive_card tool (v1.6, powered by adaptive-cards-mcp v2.3.0)"
 ---
 
 # Adaptive Card Templates
 
 Use the `adaptive_card` tool to render structured content inline in chat. Below are ready-to-use patterns for Adaptive Cards v1.6.
+
+Cards are automatically validated (AJV v1.6 schema), scored for accessibility (WCAG 0-100), adapted for the target host, and given a cardId for session persistence. Each emitted card also gets a preview URL for the Adaptive Cards Designer.
 
 ## Status Dashboard
 

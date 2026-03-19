@@ -56,6 +56,16 @@ describe("buildCardPromptGuidance", () => {
     expect(guidance).toContain("Rating");
   });
 
+  it("includes v1.6 additional elements and input types", () => {
+    const guidance = buildCardPromptGuidance("native");
+    expect(guidance).toContain("Input.Rating");
+    expect(guidance).toContain("Input.DataGrid");
+    expect(guidance).toContain("Chart.HorizontalBar");
+    expect(guidance).toContain("ProgressRing");
+    expect(guidance).toContain("Spinner");
+    expect(guidance).toContain("List");
+  });
+
   it("includes dynamic patterns from MCP library", () => {
     const guidance = buildCardPromptGuidance("native");
     // These come from getAllPatterns() in the MCP library
@@ -66,7 +76,38 @@ describe("buildCardPromptGuidance", () => {
 
   it("mentions validation and accessibility in preamble", () => {
     const guidance = buildCardPromptGuidance("native");
-    expect(guidance).toContain("validated");
+    expect(guidance).toContain("Validated");
     expect(guidance).toContain("accessibility");
+    expect(guidance).toContain("AJV");
+  });
+
+  it("includes accessibility best practices section", () => {
+    const guidance = buildCardPromptGuidance("native");
+    expect(guidance).toContain("Accessibility (WCAG)");
+    expect(guidance).toContain("altText");
+    expect(guidance).toContain("wrap: true");
+    expect(guidance).toContain("speak");
+  });
+
+  it("includes host compatibility section for native capability", () => {
+    const guidance = buildCardPromptGuidance("native");
+    expect(guidance).toContain("Host compatibility");
+    expect(guidance).toContain("teams");
+  });
+
+  it("does not include host compatibility for fallback capability", () => {
+    const guidance = buildCardPromptGuidance("fallback");
+    expect(guidance).not.toContain("Host compatibility");
+  });
+
+  it("includes Action.Execute verb guidance", () => {
+    const guidance = buildCardPromptGuidance("native");
+    expect(guidance).toContain("verb");
+    expect(guidance).toContain("card refresh");
+  });
+
+  it("accepts optional host parameter", () => {
+    const guidance = buildCardPromptGuidance("native", "teams");
+    expect(guidance).toContain("Adaptive Cards");
   });
 });

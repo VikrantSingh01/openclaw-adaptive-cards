@@ -5,9 +5,20 @@ import {
   adaptCardForHost,
   checkCardAccessibility,
   analyzeCard,
+  findDuplicateIds,
   getValidElementTypes,
   getValidActionTypes,
   getAllPatterns,
+  scorePatterns,
+  findPatternByName,
+  getAllHostSupport,
+  getHostSupport,
+  storeCard,
+  getCard,
+  writePreviewFile,
+  generateCard,
+  validateCardFull,
+  suggestLayout,
 } from "./mcp-bridge.js";
 
 describe("validateCard (MCP bridge)", () => {
@@ -85,7 +96,6 @@ describe("adaptCardForHost (MCP bridge)", () => {
 
   it("maps 'viva' to 'viva-connections'", () => {
     const body = [{ type: "TextBlock", text: "Hello" }];
-    // Should not throw even though we pass "viva" not "viva-connections"
     const result = adaptCardForHost(body, undefined, "viva");
     expect(Array.isArray(result.body)).toBe(true);
   });
@@ -118,6 +128,26 @@ describe("analyzeCard (MCP bridge)", () => {
     expect(result.elementCount).toBeGreaterThanOrEqual(2);
     expect(Array.isArray(result.elementTypes)).toBe(true);
     expect(result.elementTypes).toContain("TextBlock");
+  });
+});
+
+describe("findDuplicateIds (MCP bridge)", () => {
+  it("returns empty array when no duplicates", () => {
+    const body = [
+      { type: "TextBlock", text: "a", id: "t1" },
+      { type: "TextBlock", text: "b", id: "t2" },
+    ];
+    const result = findDuplicateIds(body);
+    expect(result).toHaveLength(0);
+  });
+
+  it("detects duplicate IDs", () => {
+    const body = [
+      { type: "TextBlock", text: "a", id: "same" },
+      { type: "TextBlock", text: "b", id: "same" },
+    ];
+    const result = findDuplicateIds(body);
+    expect(result).toContain("same");
   });
 });
 
@@ -161,5 +191,95 @@ describe("getAllPatterns (MCP)", () => {
     expect(names).toContain("incident-alert");
     expect(names).toContain("calendar-event");
     expect(names).toContain("pull-request");
+  });
+});
+
+describe("scorePatterns (MCP)", () => {
+  it("returns scored patterns for a description", () => {
+    const scored = scorePatterns("expense approval workflow");
+    expect(Array.isArray(scored)).toBe(true);
+    expect(scored.length).toBeGreaterThan(0);
+    // Top result should be approval-related
+    expect(scored[0].pattern.name).toContain("approval");
+  });
+});
+
+describe("findPatternByName (MCP)", () => {
+  it("finds a pattern by name", () => {
+    const pattern = findPatternByName("approval");
+    expect(pattern).toBeDefined();
+    expect(pattern?.name).toBe("approval");
+  });
+
+  it("returns undefined for unknown name", () => {
+    const pattern = findPatternByName("nonexistent-pattern-xyz");
+    expect(pattern).toBeUndefined();
+  });
+});
+
+describe("getAllHostSupport (MCP)", () => {
+  it("returns support info for all hosts", () => {
+    const hosts = getAllHostSupport();
+    expect(typeof hosts).toBe("object");
+    expect(hosts).toHaveProperty("teams");
+    expect(hosts).toHaveProperty("outlook");
+    expect(hosts).toHaveProperty("webex");
+  });
+});
+
+describe("getHostSupport (MCP bridge)", () => {
+  it("returns support info for a specific host", () => {
+    const info = getHostSupport("teams");
+    expect(typeof info).toBe("object");
+    expect(info).toHaveProperty("maxVersion");
+  });
+
+  it("maps 'viva' to 'viva-connections'", () => {
+    const info = getHostSupport("viva");
+    expect(typeof info).toBe("object");
+    expect(info).toHaveProperty("maxVersion");
+  });
+});
+
+describe("storeCard / getCard (MCP bridge)", () => {
+  it("stores and retrieves a card", () => {
+    const body = [{ type: "TextBlock", text: "stored" }];
+    const cardId = storeCard(body);
+    expect(typeof cardId).toBe("string");
+    expect(cardId.startsWith("card-")).toBe(true);
+
+    const retrieved = getCard(cardId);
+    expect(retrieved).not.toBeNull();
+    expect((retrieved as Record<string, unknown>).type).toBe("AdaptiveCard");
+  });
+
+  it("stores with metadata", () => {
+    const body = [{ type: "TextBlock", text: "meta" }];
+    const cardId = storeCard(body, undefined, { channel: "teams" });
+    expect(typeof cardId).toBe("string");
+  });
+});
+
+describe("writePreviewFile (MCP bridge)", () => {
+  it("returns a file:// URL", () => {
+    const body = [{ type: "TextBlock", text: "preview" }];
+    const url = writePreviewFile(body);
+    expect(typeof url).toBe("string");
+    expect(url.startsWith("file://")).toBe(true);
+    expect(url).toContain(".html");
+  });
+});
+
+describe("high-level tool handlers (MCP pass-through)", () => {
+  it("generateCard is a function", () => {
+    expect(typeof generateCard).toBe("function");
+  });
+
+  it("validateCardFull is a function", () => {
+    expect(typeof validateCardFull).toBe("function");
+  });
+
+  it("suggestLayout is a function", () => {
+    expect(typeof suggestLayout).toBe("function");
   });
 });

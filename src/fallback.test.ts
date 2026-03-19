@@ -99,8 +99,39 @@ describe("generateFallbackText", () => {
     expect(generateFallbackText(body)).toBe("[Enter name]");
   });
 
+  it("extracts ActionSet button titles", () => {
+    const body = [
+      {
+        type: "ActionSet",
+        actions: [
+          { type: "Action.Submit", title: "Save" },
+          { type: "Action.OpenUrl", title: "View" },
+        ],
+      },
+    ];
+    expect(generateFallbackText(body)).toBe("[Save]\n[View]");
+  });
+
+  it("extracts Icon name", () => {
+    const body = [{ type: "Icon", name: "CheckmarkCircle" }];
+    expect(generateFallbackText(body)).toBe("[CheckmarkCircle]");
+  });
+
+  it("extracts List items", () => {
+    const body = [
+      {
+        type: "List",
+        items: [
+          { title: "Task 1", subtitle: "Due tomorrow" },
+          { title: "Task 2" },
+        ],
+      },
+    ];
+    expect(generateFallbackText(body)).toBe("- Task 1\n  Due tomorrow\n- Task 2");
+  });
+
   it("returns empty string for unsupported elements", () => {
-    const body = [{ type: "ActionSet" }, { type: "Media" }];
+    const body = [{ type: "Media" }];
     expect(generateFallbackText(body)).toBe("");
   });
 
