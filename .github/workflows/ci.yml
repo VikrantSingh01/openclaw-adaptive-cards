@@ -18,7 +18,7 @@ jobs:
       - name: Checkout adaptive-cards-mcp (sibling dependency)
         run: git clone --depth 1 https://github.com/VikrantSingh01/adaptive-cards-mcp.git ../adaptive-cards-mcp
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
 
