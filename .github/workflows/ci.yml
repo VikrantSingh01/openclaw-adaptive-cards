@@ -16,10 +16,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Checkout adaptive-cards-mcp (sibling dependency)
-        uses: actions/checkout@v4
-        with:
-          repository: VikrantSingh01/adaptive-cards-mcp
-          path: ../adaptive-cards-mcp
+        run: git clone --depth 1 https://github.com/VikrantSingh01/adaptive-cards-mcp.git ../adaptive-cards-mcp
 
       - uses: actions/setup-node@v4
         with:
