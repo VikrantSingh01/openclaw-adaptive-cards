@@ -14,9 +14,18 @@ jobs:
         node-version: [22, 23]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Checkout adaptive-cards-mcp (sibling dependency)
+        run: git clone --depth 1 https://github.com/VikrantSingh01/adaptive-cards-mcp.git ../adaptive-cards-mcp
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+
+      - name: Build adaptive-cards-mcp core
+        working-directory: ../adaptive-cards-mcp/packages/core
+        run: npm ci && npm run build
+
       - run: npm install
       - run: npm run typecheck
       - run: npm test

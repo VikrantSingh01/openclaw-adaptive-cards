@@ -119,8 +119,8 @@ export function buildCardPromptGuidance(
     try {
       const hosts = getAllHostSupport();
       for (const [hostName, info] of Object.entries(hosts)) {
-        const maxVer = (info as Record<string, unknown>).maxVersion ?? "1.6";
-        const unsupported = (info as Record<string, unknown>).unsupportedElements;
+        const maxVer = (info as unknown as Record<string, unknown>).maxVersion ?? "1.6";
+        const unsupported = (info as unknown as Record<string, unknown>).unsupportedElements;
         if (Array.isArray(unsupported) && unsupported.length > 0) {
           lines.push(`**${hostName}** (v${maxVer}): Avoid ${unsupported.slice(0, 5).join(", ")}${unsupported.length > 5 ? ` (+${unsupported.length - 5} more)` : ""}`);
         } else {
