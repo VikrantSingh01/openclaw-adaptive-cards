@@ -1,6 +1,11 @@
 # Changelog
 
-## 4.1.0
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [4.1.0] - 2026-03-22
 
 ### Sync with adaptive-cards-mcp v2.3.0
 
@@ -43,7 +48,7 @@ Full alignment with the MCP server's latest capabilities (9 tools, 924 tests, 36
 - `GenerateCardOutput`, `OptimizeCardOutput`, `SuggestLayoutOutput`
 - `CardIntent`, `HostVersionSupport`
 
-## 4.0.0
+## [4.0.0] - 2026-03-16
 
 ### Architecture: MCP Server as Shared Core
 
@@ -83,7 +88,7 @@ The plugin now consumes `adaptive-cards-mcp` (v2.0.0) as its validation, host co
 - `src/host-compat.ts` — Replaced by MCP bridge to `adaptive-cards-mcp`
 - `getKnownElementTypes()` / `getKnownActionTypes()` — Use `getValidElementTypes()` / `getValidActionTypes()` (re-exported from MCP)
 
-## 3.0.0
+## [3.0.0] - 2026-03-10
 
 ### Features
 
@@ -96,7 +101,7 @@ The plugin now consumes `adaptive-cards-mcp` (v2.0.0) as its validation, host co
 - **Enterprise card templates:** Approval Workflow, Incident Alert, Calendar Event, Profile Card, Pull Request Review
 - **Structured details output:** Tool result `details.adaptiveCard` carries parsed card object plus validation and adaptation metadata
 
-## 2.0.0
+## [2.0.0] - 2026-03-01
 
 ### Features
 
@@ -106,7 +111,7 @@ The plugin now consumes `adaptive-cards-mcp` (v2.0.0) as its validation, host co
 - **Card templates skill:** 7 ready-to-use card templates
 - **Prompt guidance module:** Exported `buildCardPromptGuidance()` and `formatActionAsMessage()`
 
-## 1.0.0
+## [1.0.0] - 2026-02-15
 
 Initial release.
 

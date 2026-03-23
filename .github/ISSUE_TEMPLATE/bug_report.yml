@@ -1,0 +1,57 @@
+name: Bug Report
+description: Report a bug with the openclaw-adaptive-cards plugin
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill out the details below.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened? What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: card-json
+    attributes:
+      label: Card JSON (if applicable)
+      description: The card body/actions JSON that triggered the issue
+      render: json
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Install plugin
+        2. Call adaptive_card tool with...
+        3. See error...
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: Channel / Platform
+      options:
+        - iOS (SwiftUI)
+        - Android (Jetpack Compose)
+        - Microsoft Teams
+        - Web
+        - Telegram
+        - Slack
+        - Other
+  - type: input
+    id: version
+    attributes:
+      label: Plugin Version
+      placeholder: e.g., 4.1.0
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js Version
+      placeholder: e.g., 22.0.0

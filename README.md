@@ -1,22 +1,48 @@
 # openclaw-adaptive-cards
 
-Adaptive Cards plugin for [OpenClaw](https://openclaw.ai) — gives the AI an `adaptive_card` tool to respond with native [Adaptive Cards](https://adaptivecards.io/) (v1.6) instead of plain text.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+[![Adaptive Cards](https://img.shields.io/badge/Adaptive%20Cards-v1.6-blue.svg)](https://adaptivecards.io/)
+[![CI](https://github.com/VikrantSingh01/openclaw-adaptive-cards/actions/workflows/ci.yml/badge.svg)](https://github.com/VikrantSingh01/openclaw-adaptive-cards/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/Tests-86%20passing-brightgreen.svg)]()
+[![OpenClaw Plugin](https://img.shields.io/badge/OpenClaw-plugin-purple.svg)](https://openclaw.ai)
+[![npm](https://img.shields.io/npm/v/@vikrantsingh01/openclaw-adaptive-cards.svg)](https://www.npmjs.com/package/@vikrantsingh01/openclaw-adaptive-cards)
+[![GitHub stars](https://img.shields.io/github/stars/VikrantSingh01/openclaw-adaptive-cards.svg?style=social)](https://github.com/VikrantSingh01/openclaw-adaptive-cards)
 
-Powered by [adaptive-cards-mcp](https://github.com/VikrantSingh01/adaptive-cards-mcp) (v2.3.0) — 9 tools, 924 tests, 21 layout patterns, schema validation, host compatibility, and accessibility scoring.
+Adaptive Cards plugin for [OpenClaw](https://openclaw.ai) — gives the AI an `adaptive_card` tool to respond with native [Adaptive Cards](https://adaptivecards.io/) (v1.6) instead of plain text. Powered by [adaptive-cards-mcp](https://github.com/VikrantSingh01/adaptive-cards-mcp) (v2.3.0) — 9 tools, 924 tests, 21 layout patterns, schema validation, host compatibility, and accessibility scoring.
+
+> **Blog:** [Building GenUI for AI Agents: Native Adaptive Cards Without Changing the Gateway](BLOG.md)
 
 Cards render natively on:
-- **iOS** — SwiftUI via [AdaptiveCards-Mobile](https://github.com/VikrantSingh01/AdaptiveCards-Mobile)
-- **Android** — Jetpack Compose via AdaptiveCards-Mobile
-- **Teams** — Bot Framework attachment (native AC rendering)
-- **Web** — [adaptivecards.io](https://www.npmjs.com/package/adaptivecards) JavaScript SDK
 
-Channels that don't support cards (Telegram, Slack, IRC) see auto-generated fallback text.
+| Platform | Renderer | Technology |
+|----------|----------|------------|
+| **iOS** | [AdaptiveCards-Mobile](https://github.com/VikrantSingh01/AdaptiveCards-Mobile) | SwiftUI |
+| **Android** | [AdaptiveCards-Mobile](https://github.com/VikrantSingh01/AdaptiveCards-Mobile) | Jetpack Compose |
+| **Teams** | Bot Framework attachment | Native AC rendering |
+| **Web** | [adaptivecards.io](https://www.npmjs.com/package/adaptivecards) | JavaScript SDK |
+| **Telegram / Slack / IRC** | Auto-generated fallback text | Plain text extraction |
 
-## Install
+## Topics
+
+[Quick Start](#quick-start) | [Ecosystem](#ecosystem) | [Architecture](#architecture) | [Usage](#usage) | [Supported Elements](#supported-elements) | [Exports](#exports) | [What's New](#whats-new-in-v410) | [Development](#development) | [Related](#related)
+
+**Documentation:** [AGENTS.md](AGENTS.md) (AI agent guidance) | [CONTRIBUTING.md](CONTRIBUTING.md) (developer guide) | [BLOG.md](BLOG.md) (narrative deep-dive) | [CHANGELOG.md](CHANGELOG.md) (version history)
+
+## Quick Start
 
 ```bash
 openclaw plugins install @vikrantsingh01/openclaw-adaptive-cards
 ```
+
+That's it — no configuration needed. The plugin registers the `adaptive_card` tool automatically.
+
+### What happens next
+
+1. The agent's system prompt is augmented with 21 card layout patterns and channel-aware guidance
+2. When the agent decides structured content benefits from visual layout, it calls the `adaptive_card` tool
+3. The card is validated against the official v1.6 JSON Schema, scored for accessibility, and adapted for the target host
+4. Clients regex-extract the card JSON from HTML comment markers and render natively
 
 ## Ecosystem
 
@@ -257,6 +283,36 @@ import {
 
 No configuration needed — the plugin is stateless.
 
+## What's New in v4.1.0
+
+- **Card persistence** — `storeCard()` / `getCard()` / `listCards()` with session-scoped 30-min TTL
+- **Preview generation** — `writePreviewFile()` generates HTML preview for Adaptive Cards Designer
+- **Duplicate ID detection** — `findDuplicateIds()` catches broken Action.ToggleVisibility targets
+- **Pattern scoring** — `scorePatterns()` ranks all 21 patterns against natural language descriptions
+- **High-level tool handlers** — `generateCard()`, `validateCardFull()`, `optimizeCard()`, `dataToCard()`, `suggestLayout()`
+- **Full sync** with adaptive-cards-mcp v2.3.0 (9 tools, 924 tests, 36 examples)
+
+See [CHANGELOG.md](CHANGELOG.md) for full version history.
+
+## Development
+
+```bash
+# Clone and install
+git clone https://github.com/VikrantSingh01/openclaw-adaptive-cards.git
+cd openclaw-adaptive-cards && npm install
+
+# Run tests
+npm test
+
+# Type check
+npm run typecheck
+
+# Full check (typecheck + test)
+npm run check
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture details, testing guidelines, and PR checklist.
+
 ## Origin
 
 This plugin was extracted from [openclaw/openclaw#33486](https://github.com/openclaw/openclaw/pull/33486) (*Extensions: add adaptive-cards extension for native GenUI*) at the maintainers' request to be published as a standalone third-party plugin.
@@ -269,6 +325,7 @@ Community plugins listing PR: [openclaw/openclaw#41735](https://github.com/openc
 - [AdaptiveCards-Mobile](https://github.com/VikrantSingh01/AdaptiveCards-Mobile) — Native renderers for iOS (SwiftUI) and Android (Jetpack Compose)
 - [Adaptive Cards v1.6 Schema Explorer](https://adaptivecards.io/explorer/)
 - [adaptivecards npm package](https://www.npmjs.com/package/adaptivecards) — JavaScript SDK for web rendering
+- [Blog: Building GenUI for AI Agents with Adaptive Cards](https://singhvikrant.substack.com/p/i-built-an-mcp-server-that-makes)
 
 ## License
 
