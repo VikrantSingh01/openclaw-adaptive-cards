@@ -65,7 +65,7 @@
     "adaptive-cards-mcp": "file:../adaptive-cards-mcp/packages/core"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.2",
     "vitest": "^3.2.4"
   },
   "peerDependencies": {
